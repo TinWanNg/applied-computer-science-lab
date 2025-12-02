@@ -1,0 +1,5 @@
+pypdf
+tf-keras
+sentence-transformers
+scikit-learn
+numpy
