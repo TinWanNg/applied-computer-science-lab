@@ -3,3 +3,4 @@ tf-keras
 sentence-transformers
 scikit-learn
 numpy
+chromadb

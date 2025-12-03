@@ -1,11 +1,10 @@
 from pypdf import PdfReader
 import re
 from sentence_transformers import SentenceTransformer
-import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
+import chromadb
 
 # --- Step 1: Dataset chosen ---
-pdf_path = "vector-embeddings/penguins.pdf"
+pdf_path = "penguins.pdf"
 reader = PdfReader(pdf_path)
 
 # --- Step 2: Split text into chunks ---
@@ -60,44 +59,71 @@ model = SentenceTransformer('all-MiniLM-L6-v2')
 embeddings = model.encode(chunks, show_progress_bar=True)
 print(f"\nEmbeddings shape: {embeddings.shape}")  # Should be (num_chunks, dimensional embeddings)
 
-# --- Step 4: Store embeddings in vector db ---
-# In production, we would use a specialized vector database which enables efficient similarity search
-# Here we use a simple numpy array 
-embeddings_matrix = np.array(embeddings)
-print(f"Stored {len(embeddings_matrix)} embeddings in vector database")
+# --- Step 4: Store embeddings in vector db (ChromaDB) ---
+
+# Initialize persistent Chroma client and collection
+chroma_client = chromadb.PersistentClient(path="chroma_db")  # folder on disk
+collection = chroma_client.get_or_create_collection(
+    name="penguins_chunks",
+    metadata={"hnsw:space": "cosine"}  # cosine distance space
+)
+
+# Prepare IDs and optional metadata for each chunk
+ids = [f"chunk_{i}" for i in range(len(chunks))]
+metadatas = [{"chunk_index": i} for i in range(len(chunks))]
+
+# Upsert into Chroma (so re-running script just overwrites)
+collection.upsert(
+    ids=ids,
+    documents=chunks,
+    embeddings=embeddings.tolist(),  # Chroma expects lists, not numpy arrays
+    metadatas=metadatas,
+)
+
+print(f"Stored {len(chunks)} embeddings in Chroma vector database")
 
 # --- Step 5: Similarity search ---
-# Implement semantic search using vector similarity
+# Implement semantic search using vector similarity via vector DB
 def search_similar_chunks(query, top_k=3):
     """
-    Search for the most similar chunks to the query using cosine similarity
-    
+    Search for the most similar chunks to the query using ChromaDB
+
     Args:
         query: Natural language question or search term
         top_k: Number of most similar chunks to return
-    
+
     Returns:
-        List of dicts containing chunk text, similarity score, and index
+        List of dicts containing chunk text, similarity score (approx), and metadata
     """
     # Encode query using the same model used for chunks
-    query_embedding = model.encode([query])
-    
-    # How similar is the query to each chunk?
-    # Cosine similarity = -1 to 1, where 1 = identical
-    similarities = cosine_similarity(query_embedding, embeddings_matrix)[0]
-    
-    # Get indices of top k most similar chunks
-    top_indices = np.argsort(similarities)[::-1][:top_k]  # [::-1] reverses to descending order
-    
+    query_embedding = model.encode([query])[0].tolist()
+
+    # Let Chroma do the similarity search internally
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=top_k,
+        include=["documents", "distances", "metadatas"],  # removed "ids"
+    )
+
+    docs = results["documents"][0]
+    distances = results["distances"][0]
+    metadatas = results["metadatas"][0]
+    ids = results["ids"][0]
+
     results = []
-    for idx in top_indices:
+    for i in range(len(docs)):
+        # Chroma returns distances in cosine space → smaller = closer
+        # We convert to a similarity-ish score for display
+        similarity = 1.0 - distances[i]
         results.append({
-            'chunk': chunks[idx],
-            'similarity': similarities[idx],
-            'index': idx
+            "id": ids[i],
+            "chunk": docs[i],
+            "similarity": similarity,
+            "index": metadatas[i].get("chunk_index"),
         })
-    
+
     return results
+
 
 # --- Step 6: Retrieve top k chunks for query ---
 # Test the semantic search with a sample query
