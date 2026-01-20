@@ -30,5 +30,6 @@ tqdm>=4.66.0
 streamlit>=1.40.0
 
 unstructured
-whisper
+openai-whisper
 langchain-huggingface
+ffmpeg

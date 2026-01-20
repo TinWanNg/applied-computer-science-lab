@@ -24,7 +24,7 @@ from utils import clean_text
 # PDF Loading
 # ------------------------------------------------------------
 def load_pdf_docs_with_langchain() -> List[Document]:
-    """Carga todos los archivos .pdf en local_docs/pdfs/ usando PyPDFLoader."""
+    """Load all .pdf files from local_docs/pdfs/ using PyPDFLoader."""
     docs: List[Document] = []
     pdf_paths = list(PDFS_DIR.glob("*.pdf"))
     
@@ -35,9 +35,9 @@ def load_pdf_docs_with_langchain() -> List[Document]:
             for d in loaded_docs:
                 d.page_content = clean_text(d.page_content)
                 docs.append(d)
-            print(f"Cargado PDF: {pdf_path.name}")
+            print(f"Loaded PDF: {pdf_path.name}")
         except Exception as e:
-            print(f"Error cargando PDF {pdf_path}: {e}")
+            print(f"Error loading PDF {pdf_path}: {e}")
     return docs
 
 
@@ -45,21 +45,21 @@ def load_pdf_docs_with_langchain() -> List[Document]:
 # Text File Loading
 # ------------------------------------------------------------
 def load_txt_docs_with_langchain() -> List[Document]:
-    """Carga todos los archivos .txt en local_docs/texts/ como objetos Document."""
+    """Load all .txt files from local_docs/texts/ as Document objects."""
     docs: List[Document] = []
     txt_paths = list(TEXTS_DIR.glob("*.txt"))
 
     for txt_path in txt_paths:
         try:
-            # Importante: encoding='utf-8' para evitar errores con tildes
+            # Important: encoding='utf-8' to avoid errors with special characters
             loader = TextLoader(str(txt_path), encoding="utf-8")
             loaded_docs = loader.load()
             for d in loaded_docs:
                 d.page_content = clean_text(d.page_content)
                 docs.append(d)
-            print(f"Cargado TXT: {txt_path.name}")
+            print(f"Loaded TXT: {txt_path.name}")
         except Exception as e:
-            print(f"Error cargando TXT {txt_path}: {e}")
+            print(f"Error loading TXT {txt_path}: {e}")
     return docs
 
 
@@ -68,56 +68,56 @@ def load_txt_docs_with_langchain() -> List[Document]:
 # ------------------------------------------------------------
 def load_video_docs_with_whisper() -> List[Document]:
     """
-    Busca archivos .mp4, los transcribe con Whisper y carga el texto resultante.
-    Si ya existe la transcripción (.txt), la usa para ahorrar tiempo.
+    Find .gif files, transcribe them with Whisper, and load the resulting text.
+    If the transcription (.txt) already exists, it uses it to save time.
     """
     docs: List[Document] = []
-    # Buscamos archivos mp4
-    video_paths = list(VIDEOS_DIR.glob("*.mp4"))
+    # Search for gif files
+    video_paths = list(VIDEOS_DIR.glob("*.gif"))
     
     if not video_paths:
         return []
 
-    print(f"Detectados {len(video_paths)} videos. Preparando Whisper...")
+    print(f"Detected {len(video_paths)} videos. Loading Whisper...")
     
-    # Cargamos el modelo 'base' (equilibrio entre velocidad y precisión)
-    # Si tienes GPU lo usará, si no, usará CPU (más lento pero funciona)
+    # Load the 'base' model (balance between speed and accuracy)
+    # If you have GPU it will use it, otherwise CPU (slower but works)
     model = whisper.load_model("base")
 
     for video_path in video_paths:
         try:
-            # Definimos el nombre del archivo de texto de salida
+            # Define the output text file name
             txt_output_path = video_path.with_suffix(".txt")
             
             transcript_text = ""
 
-            # 1. Comprobamos si YA existe la transcripción para no repetir el proceso
+            # 1. Check if transcription already exists to avoid repeating the process
             if txt_output_path.exists():
-                print(f"Usando transcripción existente para: {video_path.name}")
+                print(f"Using existing transcription for: {video_path.name}")
                 with open(txt_output_path, "r", encoding="utf-8") as f:
                     transcript_text = f.read()
             
-            # 2. Si NO existe, transcribimos
+            # 2. If it doesn't exist, transcribe
             else:
-                print(f"Transcribiendo video (esto puede tardar): {video_path.name}...")
+                print(f"Transcribing video (this may take a while): {video_path.name}...")
                 result = model.transcribe(str(video_path))
                 transcript_text = result["text"]
                 
-                # Guardamos el resultado en un .txt para la próxima vez
+                # Save the result to a .txt file for next time
                 with open(txt_output_path, "w", encoding="utf-8") as f:
                     f.write(transcript_text)
-                print(f"Transcripción guardada en: {txt_output_path.name}")
+                print(f"Transcription saved to: {txt_output_path.name}")
 
-            # 3. Convertimos a objeto Document de LangChain
+            # 3. Convert to LangChain Document object
             if transcript_text:
-                # Creamos el documento manualmente
+                # Create the document manually
                 doc = Document(page_content=clean_text(transcript_text))
-                doc.metadata["source"] = video_path.name # Guardamos origen
+                doc.metadata["source"] = video_path.name # Save origin
                 docs.append(doc)
 
         except Exception as e:
-            print(f"Error procesando video {video_path.name}: {e}")
-            print("NOTA: Si el error menciona 'ffmpeg', necesitas instalarlo en tu sistema.")
+            print(f"Error processing video {video_path.name}: {e}")
+            print("NOTE: If the error mentions 'ffmpeg', you need to install it on your system.")
 
     return docs
 

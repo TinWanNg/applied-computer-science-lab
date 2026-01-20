@@ -97,7 +97,6 @@ def build_chroma_vectorstore(
             persist_directory=str(db_path),
             collection_name="rag_penguins",
         )
-        vectorstore.persist()
         return vectorstore
 
     # Load existing DB
