@@ -4,6 +4,7 @@ Handles PDFs, text files, web pages, images, and videos.
 """
 from typing import List
 from pathlib import Path
+import time
 import whisper
 import requests
 from bs4 import BeautifulSoup
@@ -68,12 +69,12 @@ def load_txt_docs_with_langchain() -> List[Document]:
 # ------------------------------------------------------------
 def load_video_docs_with_whisper() -> List[Document]:
     """
-    Find .gif files, transcribe them with Whisper, and load the resulting text.
+    Find .mp4 files, transcribe them with Whisper, and load the resulting text.
     If the transcription (.txt) already exists, it uses it to save time.
     """
     docs: List[Document] = []
-    # Search for gif files
-    video_paths = list(VIDEOS_DIR.glob("*.gif"))
+    # Search for mp4 files
+    video_paths = list(VIDEOS_DIR.glob("*.mp4"))
     
     if not video_paths:
         return []
@@ -198,8 +199,23 @@ def describe_image(path: Path) -> str:
         "Describe this image in factual detail. "
         "Mention objects, environment, and any visible text."
     )
-    resp = gemini_vision.generate_content([prompt, img])
-    return resp.text.strip()
+    
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            resp = gemini_vision.generate_content([prompt, img])
+            return resp.text.strip()
+        except Exception as e:
+            if "429" in str(e) or "Quota exceeded" in str(e):
+                if attempt < max_retries - 1:
+                    wait_time = 30  # Wait 30 seconds before retry
+                    print(f"Rate limit hit. Waiting {wait_time}s before retry...")
+                    time.sleep(wait_time)
+                else:
+                    print(f"Failed to describe {path.name} after {max_retries} attempts")
+                    return f"[Image: {path.name} - description unavailable due to rate limit]"
+            else:
+                raise
 
 
 def load_image_docs() -> List[Document]:
@@ -213,16 +229,19 @@ def load_image_docs() -> List[Document]:
     for ext in ("*.jpg", "*.jpeg", "*.png", "*.webp"):
         image_paths.extend(IMAGES_DIR.glob(ext))
 
-    for img_path in image_paths:
-        try:
-            desc = describe_image(img_path)
-            docs.append(
-                Document(
-                    page_content=clean_text(desc),
-                    metadata={"source": f"image:{img_path.name}"},
-                )
+    print(f"Found {len(image_paths)} images to process...")
+    
+    for i, img_path in enumerate(image_paths, 1):
+        print(f"Processing image {i}/{len(image_paths)}: {img_path.name}")
+        desc = describe_image(img_path)
+        docs.append(
+            Document(
+                page_content=clean_text(desc),
+                metadata={"source": f"image:{img_path.name}"},
             )
-        except Exception as e:
-            print(f"Failed describing image {img_path}: {e}")
+        )
+        # Add delay between requests to avoid rate limits (free tier: 5 req/min)
+        if i < len(image_paths):
+            time.sleep(13)  # Wait ~13 seconds between images (4-5 per minute
 
     return docs
