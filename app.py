@@ -74,7 +74,9 @@ def main():
         This app demonstrates a **Retrieval-Augmented Generation (RAG)** pipeline.
 
         **Data sources:**
-        - Local PDFs and .txt in `./local_docs/`
+        - Local PDFs in `./local_docs/pdfs/`
+        - Local text files in `./local_docs/texts/`
+        - Local videos in `./local_docs/videos/`
         - Local images in `./local_docs/images/`
         - Optional web pages (URLs you add in the sidebar)
 
@@ -205,7 +207,7 @@ def main():
             """
             Below are the document chunks retrieved from the vector database.
             They show **which sources** the RAG answer is grounded in
-            (PDFs, images, or web URLs).
+            (PDFs, text files, videos, images, or web URLs).
             """
         )
 
