@@ -1,6 +1,33 @@
-pypdf
+pypdf>=4.1.0
 tf-keras
-sentence-transformers
 scikit-learn
 numpy
-chromadb
+
+# Gemini API
+google-generativeai>=0.5.2
+python-dotenv>=1.0.0
+
+# Embeddings
+sentence-transformers>=2.5.0
+torch>=2.1.0        # Required for sentence-transformers and HF embeddings
+
+# Vector database
+chromadb>=0.5.0
+
+# LangChain ecosystem
+langchain>=0.2.0
+langchain-community>=0.2.0
+
+# Web scraping
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+
+# Images
+Pillow>=10.0.0
+
+# Optional but recommended
+tqdm>=4.66.0
+streamlit>=1.40.0
+
+unstructured
+whisper
