@@ -9,6 +9,7 @@ import whisper
 import requests
 from bs4 import BeautifulSoup
 from PIL import Image
+import cv2
 
 from langchain_community.document_loaders import (
     PyPDFLoader,
@@ -17,8 +18,10 @@ from langchain_community.document_loaders import (
 )
 from langchain_core.documents import Document
 
-from config import PDFS_DIR, TEXTS_DIR, VIDEOS_DIR, IMAGES_DIR, WEB_URLS, gemini_vision
+from config import PDFS_DIR, TEXTS_DIR, VIDEOS_DIR, IMAGES_DIR, WEB_URLS, openai_client
 from utils import clean_text
+import base64
+import io
 
 
 # ------------------------------------------------------------
@@ -65,11 +68,53 @@ def load_txt_docs_with_langchain() -> List[Document]:
 
 
 # ------------------------------------------------------------
-# Video Loading with Whisper
+# Video Loading with Whisper and Vision
 # ------------------------------------------------------------
+def extract_key_frames(video_path: Path, num_frames: int = 3) -> List[Image.Image]:
+    """Extract key frames from a video for visual analysis."""
+    cap = cv2.VideoCapture(str(video_path))
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    
+    if total_frames == 0:
+        cap.release()
+        return []
+    
+    # Extract frames evenly spaced throughout the video
+    frame_indices = [int(total_frames * i / (num_frames + 1)) for i in range(1, num_frames + 1)]
+    frames = []
+    
+    for idx in frame_indices:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+        ret, frame = cap.read()
+        if ret:
+            # Convert BGR to RGB and then to PIL Image
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            pil_image = Image.fromarray(frame_rgb)
+            frames.append(pil_image)
+    
+    cap.release()
+    return frames
+
+
+def describe_video_frames(video_path: Path, frames: List[Image.Image]) -> str:
+    """Use OpenAI Vision to describe video frames."""
+    if not frames:
+        return ""
+    
+    prompt = (
+        "Describe what's happening in this video based on these key frames. "
+        "Include objects, actions, environment, and any visible text. "
+        "Provide a cohesive description of the video content."
+    )
+    
+    return describe_visual_content(frames, prompt, video_path.name)
+
+
 def load_video_docs_with_whisper() -> List[Document]:
     """
-    Find .mp4 files, transcribe them with Whisper, and load the resulting text.
+    Find .mp4 files and process them:
+    1. Extract and describe key frames using Gemini Vision (for visual content)
+    2. Transcribe audio using Whisper (if audio exists)
     If the transcription (.txt) already exists, it uses it to save time.
     """
     docs: List[Document] = []
@@ -79,46 +124,66 @@ def load_video_docs_with_whisper() -> List[Document]:
     if not video_paths:
         return []
 
-    print(f"Detected {len(video_paths)} videos. Loading Whisper...")
+    print(f"Detected {len(video_paths)} videos. Processing...")
     
-    # Load the 'base' model (balance between speed and accuracy)
-    # If you have GPU it will use it, otherwise CPU (slower but works)
-    model = whisper.load_model("base")
-
-    for video_path in video_paths:
+    for video_idx, video_path in enumerate(video_paths, 1):
+        print(f"\nProcessing video {video_idx}/{len(video_paths)}: {video_path.name}")
+        combined_content = []
+        
+        # 1. Visual description from frames
         try:
-            # Define the output text file name
+            print(f"  Extracting frames from {video_path.name}...")
+            frames = extract_key_frames(video_path, num_frames=3)
+            if frames:
+                print(f"  Describing visual content...")
+                visual_desc = describe_video_frames(video_path, frames)
+                if visual_desc and not visual_desc.startswith("["):
+                    combined_content.append(f"Visual Description: {visual_desc}")
+        except Exception as e:
+            print(f"  Warning: Could not extract/describe frames: {e}")
+        
+        # 2. Audio transcription with Whisper
+        try:
             txt_output_path = video_path.with_suffix(".txt")
-            
             transcript_text = ""
-
-            # 1. Check if transcription already exists to avoid repeating the process
+            
+            # Check if transcription already exists
             if txt_output_path.exists():
-                print(f"Using existing transcription for: {video_path.name}")
+                print(f"  Using existing audio transcription...")
                 with open(txt_output_path, "r", encoding="utf-8") as f:
                     transcript_text = f.read()
-            
-            # 2. If it doesn't exist, transcribe
             else:
-                print(f"Transcribing video (this may take a while): {video_path.name}...")
-                result = model.transcribe(str(video_path))
-                transcript_text = result["text"]
-                
-                # Save the result to a .txt file for next time
-                with open(txt_output_path, "w", encoding="utf-8") as f:
-                    f.write(transcript_text)
-                print(f"Transcription saved to: {txt_output_path.name}")
-
-            # 3. Convert to LangChain Document object
-            if transcript_text:
-                # Create the document manually
-                doc = Document(page_content=clean_text(transcript_text))
-                doc.metadata["source"] = video_path.name # Save origin
-                docs.append(doc)
-
+                # Try to transcribe (requires ffmpeg)
+                print(f"  Transcribing audio (if any)...")
+                try:
+                    model = whisper.load_model("base")
+                    result = model.transcribe(str(video_path))
+                    transcript_text = result["text"]
+                    
+                    # Save transcription
+                    with open(txt_output_path, "w", encoding="utf-8") as f:
+                        f.write(transcript_text)
+                    print(f"  Audio transcription saved")
+                except Exception as whisper_error:
+                    if "ffmpeg" in str(whisper_error):
+                        print(f"  Note: ffmpeg not found - skipping audio transcription")
+                    else:
+                        print(f"  Warning: Audio transcription failed: {whisper_error}")
+            
+            if transcript_text and transcript_text.strip():
+                combined_content.append(f"Audio Transcription: {transcript_text}")
         except Exception as e:
-            print(f"Error processing video {video_path.name}: {e}")
-            print("NOTE: If the error mentions 'ffmpeg', you need to install it on your system.")
+            print(f"  Warning: Could not process audio: {e}")
+        
+        # 3. Create document if we got any content
+        if combined_content:
+            full_content = "\n\n".join(combined_content)
+            doc = Document(page_content=clean_text(full_content))
+            doc.metadata["source"] = video_path.name
+            docs.append(doc)
+            print(f"  ✓ Video processed successfully")
+        else:
+            print(f"  ✗ No content extracted from video")
 
     return docs
 
@@ -190,32 +255,80 @@ def load_web_docs_with_langchain() -> List[Document]:
 
 
 # ------------------------------------------------------------
+# Shared Vision Description with OpenAI
+# ------------------------------------------------------------
+def image_to_base64(image: Image.Image) -> str:
+    """Convert PIL Image to base64 string for OpenAI API."""
+    buffered = io.BytesIO()
+    image.save(buffered, format="PNG")
+    return base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+
+def describe_visual_content(images: List[Image.Image], prompt: str, source_name: str) -> str:
+    """
+    Use OpenAI Vision to describe one or more images.
+    Handles rate limiting and retries automatically.
+    
+    Args:
+        images: List of PIL Image objects (can be single image or multiple frames)
+        prompt: The prompt to send to OpenAI
+        source_name: Name of the source (for error messages)
+    """
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            # Convert images to base64 for OpenAI API
+            image_content = []
+            for img in images:
+                base64_image = image_to_base64(img)
+                image_content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{base64_image}"
+                    }
+                })
+            
+            # Build messages with text prompt and images
+            messages = [{
+                "role": "user",
+                "content": [{"type": "text", "text": prompt}] + image_content
+            }]
+            
+            response = openai_client.chat.completions.create(
+                model="gpt-4o-mini",  # or "gpt-4-vision-preview" for better quality
+                messages=messages,
+                max_tokens=500
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except Exception as e:
+            if "429" in str(e) or "rate_limit" in str(e).lower():
+                if attempt < max_retries - 1:
+                    wait_time = 10
+                    print(f"Rate limit hit. Waiting {wait_time}s before retry...")
+                    time.sleep(wait_time)
+                else:
+                    print(f"Failed to describe {source_name} after {max_retries} attempts")
+                    return f"[{source_name} - description unavailable due to rate limit]"
+            else:
+                print(f"Error describing {source_name}: {e}")
+                return f"[{source_name} - description failed]"
+    
+    return ""
+
+
+# ------------------------------------------------------------
 # Image Description and Loading
 # ------------------------------------------------------------
 def describe_image(path: Path) -> str:
-    """Use Gemini Vision to generate a factual description of an image."""
+    """Use OpenAI Vision to generate a factual description of an image."""
     img = Image.open(path)
     prompt = (
         "Describe this image in factual detail. "
         "Mention objects, environment, and any visible text."
     )
-    
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            resp = gemini_vision.generate_content([prompt, img])
-            return resp.text.strip()
-        except Exception as e:
-            if "429" in str(e) or "Quota exceeded" in str(e):
-                if attempt < max_retries - 1:
-                    wait_time = 30  # Wait 30 seconds before retry
-                    print(f"Rate limit hit. Waiting {wait_time}s before retry...")
-                    time.sleep(wait_time)
-                else:
-                    print(f"Failed to describe {path.name} after {max_retries} attempts")
-                    return f"[Image: {path.name} - description unavailable due to rate limit]"
-            else:
-                raise
+    return describe_visual_content([img], prompt, path.name)
 
 
 def load_image_docs() -> List[Document]:

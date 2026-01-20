@@ -4,7 +4,7 @@ Handles both retrieval-augmented and baseline LLM responses.
 """
 from langchain_community.vectorstores import Chroma
 
-from config import gemini_text
+from config import openai_client
 from vectorstore import search_similar_chunks
 
 
@@ -13,7 +13,7 @@ from vectorstore import search_similar_chunks
 # ------------------------------------------------------------
 def answer_with_rag(vectorstore: Chroma, question: str, top_k: int = 3):
     """
-    Retrieve relevant chunks from the vectorstore and ask Gemini
+    Retrieve relevant chunks from the vectorstore and ask OpenAI
     to answer only using that context.
     """
     retrieved = search_similar_chunks(vectorstore, question, top_k=top_k)
@@ -36,15 +36,27 @@ Question: {question}
 
 At the end, list which DOC numbers you used in the format: [Citations: DOC 1, DOC 3]
 """
-    resp = gemini_text.generate_content(prompt)
-    return resp.text.strip(), retrieved
+    
+    response = openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=1000
+    )
+    
+    return response.choices[0].message.content.strip(), retrieved
 
 
 # ------------------------------------------------------------
 # Baseline Answer: LLM without retrieval
 # ------------------------------------------------------------
 def answer_without_rag(question: str):
-    """Ask Gemini directly without any retrieval (for comparison)."""
+    """Ask OpenAI directly without any retrieval (for comparison)."""
     prompt = f"Answer this question using your own knowledge:\n\n{question}"
-    resp = gemini_text.generate_content(prompt)
-    return resp.text.strip()
+    
+    response = openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=1000
+    )
+    
+    return response.choices[0].message.content.strip()

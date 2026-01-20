@@ -64,11 +64,11 @@ def main():
     # Page config and header
     # ---------------------------------------------------------
     st.set_page_config(
-        page_title="RAG Demo (LangChain + Chroma + Gemini)",
+        page_title="RAG Demo (LangChain + Chroma + OpenAI)",
         layout="wide",
     )
 
-    st.title("📚 RAG Demo – LangChain + Chroma + Gemini")
+    st.title("📚 RAG Demo – LangChain + Chroma + OpenAI")
     st.write(
         """
         This app demonstrates a **Retrieval-Augmented Generation (RAG)** pipeline.

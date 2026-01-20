@@ -5,7 +5,6 @@ Handles paths, API keys, and model initialization.
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-import google.generativeai as genai
 from langchain_huggingface import HuggingFaceEmbeddings
 
 # ------------------------------------------------------------
@@ -27,18 +26,17 @@ IMAGES_DIR.mkdir(exist_ok=True)
 CHROMA_PATH.mkdir(exist_ok=True)
 
 # ------------------------------------------------------------
-# Gemini API Key loading
+# OpenAI API Key loading
 # ------------------------------------------------------------
 load_dotenv()
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-if not GEMINI_API_KEY:
-    raise ValueError("Set GEMINI_API_KEY in your environment or .env file.")
+if not OPENAI_API_KEY:
+    raise ValueError("Set OPENAI_API_KEY in your environment or .env file.")
 
-# Configure Gemini client (text + vision)
-genai.configure(api_key=GEMINI_API_KEY)
-gemini_text = genai.GenerativeModel("gemini-2.5-flash")
-gemini_vision = gemini_text  # same model can handle image input
+# Configure OpenAI client
+from openai import OpenAI
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ------------------------------------------------------------
 # Embeddings model (HuggingFace)
