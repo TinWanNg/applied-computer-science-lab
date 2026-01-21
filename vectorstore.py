@@ -31,7 +31,12 @@ def split_docs_with_langchain(docs: List[Document]) -> List[Document]:
         chunk_overlap=200,      # preserve context
         separators=["\n\n", "\n", ".", " ", ""],
     )
-    return text_splitter.split_documents(docs)
+    chunks = text_splitter.split_documents(docs)
+    
+    # Filter out very short chunks (likely junk from web scraping)
+    chunks = [chunk for chunk in chunks if len(chunk.page_content.strip()) > 20]
+    
+    return chunks
 
 
 # ------------------------------------------------------------
@@ -68,7 +73,8 @@ def build_chroma_vectorstore(
         db_path.mkdir(parents=True, exist_ok=True)
 
         pdf_docs = load_pdf_docs_with_langchain()
-        web_docs = load_web_docs_with_langchain()
+        # web_docs = load_web_docs_with_langchain()  # Disabled
+        web_docs = []  # Placeholder
         image_docs = load_image_docs()
         txt_docs = load_txt_docs_with_langchain()
         video_docs = load_video_docs_with_whisper()

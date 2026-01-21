@@ -189,69 +189,90 @@ def load_video_docs_with_whisper() -> List[Document]:
 
 
 # ------------------------------------------------------------
-# Web Page Loading
+# Web Page Loading (DISABLED)
 # ------------------------------------------------------------
+# def load_web_docs_with_langchain() -> List[Document]:
+#     """
+#     Load web documents.
+#
+#     Strategy:
+#       1. Try UnstructuredURLLoader (LangChain) – good for many sites.
+#       2. If it fails or returns no documents, fall back to:
+#          requests + BeautifulSoup + manual HTML parsing.
+#     """
+#     if not WEB_URLS:
+#         return []
+#
+#     docs: List[Document] = []
+#
+#     # --- Try UnstructuredURLLoader first ---
+#     try:
+#         loader = UnstructuredURLLoader(
+#             urls=WEB_URLS,
+#             ssl_verify=False,   # avoid some SSL issues
+#             mode="elements",    # returns clean text segments
+#         )
+#         docs = loader.load()
+#
+#         for d in docs:
+#             d.page_content = clean_text(d.page_content)
+#             # Ensure source URL is properly set
+#             if "source" not in d.metadata or not d.metadata["source"]:
+#                 # Try to match to the correct URL or use first one
+#                 d.metadata["source"] = WEB_URLS[0] if WEB_URLS else "web_url"
+#             # Add metadata to indicate this is a web source
+#             d.metadata["type"] = "web"
+#
+#         if docs:
+#             print(f"Loaded {len(docs)} web docs via UnstructuredURLLoader.")
+#             return docs
+#         else:
+#             print("UnstructuredURLLoader returned no docs. Falling back to requests + BeautifulSoup.")
+#     except Exception as e:
+#         print(f"Failed loading URLs with UnstructuredURLLoader: {e}. Falling back to requests + BeautifulSoup.")
+#
+#     # --- Fallback: manual requests + BeautifulSoup parsing ---
+#     fallback_docs: List[Document] = []
+#     for url in WEB_URLS:
+#         try:
+#             headers = {
+#                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+#             }
+#             resp = requests.get(url, timeout=20, headers=headers, verify=True)
+#             resp.raise_for_status()
+#
+#             soup = BeautifulSoup(resp.text, "html.parser")
+#             
+#             # Remove scripts, styles, and other non-content elements
+#             for element in soup(["script", "style", "noscript", "iframe"]):
+#                 element.decompose()
+#             
+#             # Get all visible text
+#             raw_text = soup.get_text(separator=" ", strip=True)
+#             cleaned = clean_text(raw_text)
+#
+#             if cleaned and len(cleaned) > 100:
+#                 fallback_docs.append(
+#                     Document(
+#                         page_content=cleaned,
+#                         metadata={"source": url, "type": "web"},
+#                     )
+#                 )
+#                 print(f"Loaded web doc via fallback for {url}, chars={len(cleaned)}")
+#                 print(f"  First 500 chars: {cleaned[:500]}...")  # Debug output
+#             else:
+#                 print(f"Fallback got empty text for {url}")
+#         except Exception as e:
+#             print(f"Fallback loading failed for {url}: {e}")
+#
+#     return fallback_docs
+
+# Stub function to avoid import errors
 def load_web_docs_with_langchain() -> List[Document]:
-    """
-    Load web documents.
-
-    Strategy:
-      1. Try UnstructuredURLLoader (LangChain) – good for many sites.
-      2. If it fails or returns no documents, fall back to:
-         requests + BeautifulSoup + manual HTML parsing.
-    """
-    if not WEB_URLS:
-        return []
-
-    docs: List[Document] = []
-
-    # --- Try UnstructuredURLLoader first ---
-    try:
-        loader = UnstructuredURLLoader(
-            urls=WEB_URLS,
-            ssl_verify=False,   # avoid some SSL issues
-            mode="elements",    # returns clean text segments
-        )
-        docs = loader.load()
-
-        for d in docs:
-            d.page_content = clean_text(d.page_content)
-
-        if docs:
-            print(f"Loaded {len(docs)} web docs via UnstructuredURLLoader.")
-            return docs
-        else:
-            print("UnstructuredURLLoader returned no docs. Falling back to requests + BeautifulSoup.")
-    except Exception as e:
-        print(f"Failed loading URLs with UnstructuredURLLoader: {e}. Falling back to requests + BeautifulSoup.")
-
-    # --- Fallback: manual requests + BeautifulSoup parsing ---
-    fallback_docs: List[Document] = []
-    for url in WEB_URLS:
-        try:
-            resp = requests.get(url, timeout=15, verify=True)
-            resp.raise_for_status()
-
-            soup = BeautifulSoup(resp.text, "html.parser")
-            # Simple strategy: concatenate all <p> texts
-            paragraphs = [p.get_text(" ", strip=True) for p in soup.find_all("p")]
-            raw_text = " ".join(paragraphs)
-            cleaned = clean_text(raw_text)
-
-            if cleaned:
-                fallback_docs.append(
-                    Document(
-                        page_content=cleaned,
-                        metadata={"source": url},
-                    )
-                )
-                print(f"Loaded web doc via fallback for {url}, chars={len(cleaned)}")
-            else:
-                print(f"Fallback got empty text for {url}")
-        except Exception as e:
-            print(f"Fallback loading failed for {url}: {e}")
-
-    return fallback_docs
+    """Web loading is currently disabled."""
+    if WEB_URLS:
+        print("⚠️ Web URL loading is disabled. Web URLs will not be loaded.")
+    return []
 
 
 # ------------------------------------------------------------
