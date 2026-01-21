@@ -1,8 +1,9 @@
 # applied-computer-science-lab
 
 ## Getting Started
-`pip install -r requirements.txt`
-Run using `streamlit run app.py`
+1. `pip install -r requirements.txt`
+2. Fill in `OPENAI_API_KEY` in `.env`, referring to `.envTemplate`
+3. Run using `streamlit run app.py`
 
 ---
 
