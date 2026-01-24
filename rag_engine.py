@@ -18,24 +18,37 @@ def answer_with_rag(vectorstore: Chroma, question: str, top_k: int = 3):
     """
     retrieved = search_similar_chunks(vectorstore, question, top_k=top_k)
 
+    # Filter for relevance - only include chunks with similarity > 0.3 (cosine similarity)
+    relevant_chunks = [r for r in retrieved if r["similarity"] > 0.3]
+    
     context = ""
-    for i, r in enumerate(retrieved, start=1):
-        src = r["metadata"].get("source")
-        page = r["metadata"].get("page")
-        page_info = f", page {page}" if page is not None else ""
-        context += f"[DOC {i} | source: {src}{page_info}]\n{r['chunk']}\n\n"
+    if relevant_chunks:
+        for i, r in enumerate(relevant_chunks, start=1):
+            src = r["metadata"].get("source")
+            page = r["metadata"].get("page")
+            sim = r["similarity"]
+            page_info = f", page {page}" if page is not None else ""
+            context += f"[DOC {i} | source: {src}{page_info} | relevance: {sim:.2f}]\n{r['chunk']}\n\n"
+    else:
+        context = "[No highly relevant documents found in the knowledge base]\n"
 
     prompt = f"""
-You are a helpful assistant. Answer the user's question ONLY using the context below.
-If the answer is not in the context, say: "I don't know based on the given documents."
+    You are a helpful assistant. Answer the user's question using the provided context and your knowledge.
 
-Context:
-{context}
+    Instructions:
+    1. PRIORITIZE information from the context below when it's relevant to the question
+    2. If the context contains relevant information, use it as the primary source and cite the documents
+    3. If the context is partially relevant, blend it with your general knowledge
+    4. If the context is not relevant at all, clearly state that and answer using your general knowledge
+    5. Be conversational and helpful - don't refuse to answer just because information isn't in the documents
 
-Question: {question}
+    Context from retrieved documents:
+    {context}
 
-At the end, list which DOC numbers you used in the format: [Citations: DOC 1, DOC 3]
-"""
+    Question: {question}
+
+    At the end, list which DOC numbers you used in the format: [Citations: DOC 1, DOC 3]
+    """
     
     response = openai_client.chat.completions.create(
         model="gpt-4o-mini",
