@@ -87,6 +87,7 @@ def build_chroma_vectorstore(
                 embedding_function=embeddings,
                 persist_directory=str(db_path),
                 collection_name="rag_penguins",
+                collection_metadata={"hnsw:space": "cosine"},
             )
             return vectorstore
 
@@ -102,6 +103,7 @@ def build_chroma_vectorstore(
             embedding=embeddings,
             persist_directory=str(db_path),
             collection_name="rag_penguins",
+            collection_metadata={"hnsw:space": "cosine"},
         )
         return vectorstore
 
@@ -110,6 +112,7 @@ def build_chroma_vectorstore(
         embedding_function=embeddings,
         persist_directory=str(db_path),
         collection_name="rag_penguins",
+        collection_metadata={"hnsw:space": "cosine"},
     )
     return vectorstore
 
@@ -123,7 +126,8 @@ def search_similar_chunks(vectorstore: Chroma, query: str, top_k: int = 3):
     out = []
 
     for doc, score in results:
-        similarity = 1.0 - score  # convert distance → similarity-ish
+        # Cosine similarity: higher score = more similar (1.0 = identical, 0.0 = orthogonal)
+        similarity = score
         out.append(
             {
                 "chunk": doc.page_content,
