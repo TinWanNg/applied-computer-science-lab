@@ -73,8 +73,7 @@ def build_chroma_vectorstore(
         db_path.mkdir(parents=True, exist_ok=True)
 
         pdf_docs = load_pdf_docs_with_langchain()
-        # web_docs = load_web_docs_with_langchain()  # Disabled
-        web_docs = []  # Placeholder
+        web_docs = load_web_docs_with_langchain()
         image_docs = load_image_docs()
         txt_docs = load_txt_docs_with_langchain()
         video_docs = load_video_docs_with_whisper()
@@ -100,7 +99,7 @@ def build_chroma_vectorstore(
 
         vectorstore = Chroma.from_documents(
             documents=sanitized_docs,
-            embedding=embeddings,
+            embedding=embeddings, # hugging face all-MiniLM-L6-v2
             persist_directory=str(db_path),
             collection_name="rag_penguins",
             collection_metadata={"hnsw:space": "cosine"},

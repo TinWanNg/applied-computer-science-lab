@@ -78,7 +78,7 @@ def main():
         - Local text files in `./local_docs/texts/`
         - Local videos in `./local_docs/videos/`
         - Local images in `./local_docs/images/`
-        - ~~Optional web pages~~ (currently disabled)
+        - Web pages (add URLs in the sidebar)
 
         **Comparison:**
         - 🔎 *RAG Answer*: uses retrieved chunks from your documents
@@ -99,51 +99,25 @@ def main():
         value=3,
     )
 
-    st.sidebar.subheader("Add Web URLs (Disabled)")
+    st.sidebar.subheader("Add Web URLs")
 
-    # # Initialize URL list in session_state
-    # if "web_urls" not in st.session_state:
-    #     st.session_state.web_urls = []
-    #
-    # # Input for a new URL
-    # new_url = st.sidebar.text_input(
-    #     "Enter a web URL to include:",
-    #     placeholder="https://en.wikipedia.org/wiki/Vector_database",
-    # )
-    #
-    # # Button to add URL to list
-    # if st.sidebar.button("Add URL"):
-    #     if new_url.strip():
-    #         st.session_state.web_urls.append(new_url.strip())
-    #         st.sidebar.success(f"Added URL: {new_url.strip()}")
-    #     else:
-    #         st.sidebar.warning("Please enter a valid URL.")
-    #
-    # # Show list of URLs currently used
-    # if st.session_state.web_urls:
-    #     st.sidebar.write("### URLs to load:")
-    #     for url in st.session_state.web_urls:
-    #         st.sidebar.write(f"• {url}")
-    # else:
-    #     st.sidebar.info("No web URLs added yet. Only local PDFs/images will be used.")
-    
-    # Force empty URL list
+    # Initialize URL list in session_state
     if "web_urls" not in st.session_state:
         st.session_state.web_urls = []
     
     # Input for a new URL
-    # new_url = st.sidebar.text_input(
-    #     "Enter a web URL to include:",
-    #     placeholder="https://en.wikipedia.org/wiki/Vector_database",
-    # )
+    new_url = st.sidebar.text_input(
+        "Enter a web URL to include:",
+        placeholder="https://en.wikipedia.org/wiki/Vector_database",
+    )
 
     # Button to add URL to list
-    # if st.sidebar.button("Add URL"):
-    #     if new_url.strip():
-    #         st.session_state.web_urls.append(new_url.strip())
-    #         st.sidebar.success(f"Added URL: {new_url.strip()}")
-    #     else:
-    #         st.sidebar.warning("Please enter a valid URL.")
+    if st.sidebar.button("Add URL"):
+        if new_url.strip():
+            st.session_state.web_urls.append(new_url.strip())
+            st.sidebar.success(f"Added URL: {new_url.strip()}")
+        else:
+            st.sidebar.warning("Please enter a valid URL.")
 
     # Show list of URLs currently used
     # if st.session_state.web_urls:
